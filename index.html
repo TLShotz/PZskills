@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spiffo's Skill Book Checklist</title>
   
-  <!-- Browser Favicon / Sidebar Icon -->
   <link rel="icon" type="image/png" href="SpiffoSkipping.png">
   <link rel="apple-touch-icon" href="SpiffoSkipping.png">
 
@@ -21,6 +21,10 @@
       --accent-green-border: #4caf50;
       --friend-check: #00e5ff;
       --friend-cross: #ff4081;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
     }
 
     body {
@@ -78,7 +82,7 @@
       flex-wrap: wrap;
     }
 
-    button {
+    .btn {
       background: #2b221f;
       color: var(--text-main);
       border: 1px solid var(--border-color);
@@ -87,10 +91,10 @@
       cursor: pointer;
       font-weight: 600;
       font-size: 0.9rem;
-      transition: all 0.2s ease;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
-    button:hover {
+    .btn:hover {
       background: #3d2f2b;
       border-color: var(--spiffo-orange);
     }
@@ -143,7 +147,6 @@
       background: #4a1c1c;
     }
 
-    /* Comparison Legend Bar */
     .legend-bar {
       display: flex;
       align-items: center;
@@ -155,6 +158,10 @@
       margin-bottom: 20px;
       font-size: 0.85rem;
       flex-wrap: wrap;
+    }
+
+    .legend-bar[hidden] {
+      display: none !important;
     }
 
     .legend-title {
@@ -222,7 +229,6 @@
       border-bottom: 1px dashed #2a221f;
     }
 
-    /* Skills without books style */
     .skill-row.no-book-row {
       opacity: 0.45;
     }
@@ -248,7 +254,6 @@
       gap: 6px;
     }
 
-    /* Toggle Box */
     .box {
       width: 28px;
       height: 28px;
@@ -262,7 +267,7 @@
       font-size: 14px;
       cursor: pointer;
       user-select: none;
-      transition: all 0.15s ease;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
       position: relative;
     }
 
@@ -270,14 +275,12 @@
       border-color: var(--spiffo-orange);
     }
 
-    /* State 1: Checked */
     .box.state-check {
       background: var(--accent-green);
       border-color: var(--accent-green-border);
       color: #fff;
     }
 
-    /* Friend Compare Overlays */
     .box.friend-check {
       outline: 2px solid var(--friend-check);
       outline-offset: -1px;
@@ -288,6 +291,18 @@
       outline: 2px dashed var(--friend-cross);
       outline-offset: -1px;
       z-index: 1;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
   </style>
 </head>
@@ -303,268 +318,291 @@
         <div class="subtitle">Click boxes to toggle: Blank ➔ Read/Owned (✓)</div>
       </div>
       <div class="actions">
-        <button class="btn-save" onclick="exportToTxt()">💾 Save as TXT</button>
-        <button class="btn-load" onclick="loadFromTxt()">📂 Load TXT</button>
-        <button id="btn-compare" class="btn-compare" onclick="toggleCompare()">🤝 Compare File</button>
-        <button class="btn-reset" onclick="resetAll()">🔄 Reset All</button>
+        <button type="button" class="btn btn-save" id="btn-save">💾 Save as TXT</button>
+        <button type="button" class="btn btn-load" id="btn-load">📂 Load TXT</button>
+        <button type="button" class="btn btn-compare" id="btn-compare">🤝 Compare File</button>
+        <button type="button" class="btn btn-reset" id="btn-reset">🔄 Reset All</button>
       </div>
     </header>
 
-    <!-- Hidden file inputs -->
-    <input type="file" id="load-file-input" accept=".txt" onchange="handleLoadFileSelect(event)" style="display: none;">
-    <input type="file" id="compare-file-input" accept=".txt" onchange="handleFileSelect(event)" style="display: none;">
+    <input type="file" id="load-file-input" accept=".txt" class="visually-hidden">
+    <input type="file" id="compare-file-input" accept=".txt" class="visually-hidden">
 
-    <!-- Comparison Legend -->
-    <div id="legend-bar" class="legend-bar" style="display: none;">
+    <div id="legend-bar" class="legend-bar" hidden>
       <span class="legend-title">Compare Mode Active</span>
       <span class="legend-item"><span class="legend-box friend-check-demo"></span> Friend Has/Read (✓)</span>
       <span class="legend-item"><span class="legend-box friend-cross-demo"></span> Friend Needs (Blank)</span>
     </div>
 
-    <div id="skills-grid" class="grid"></div>
+    <main id="skills-grid" class="grid"></main>
   </div>
 
   <script>
-    const skillData = {
-      "Combat - Firearms": ["Aiming", "Reloading"],
-      "Combat - Melee": ["Axe", "Long Blade", "Long Blunt", "Maintenance", "Short Blade", "Short Blunt", "Spear"],
-      "Crafting": ["Blacksmithing", "Carpentry", "Carving", "Cooking", "Electrical", "Glassmaking", "Knapping", "Masonry", "Mechanics", "Pottery", "Tailoring", "Welding"],
-      "Farming": ["Agriculture", "Animal Care", "Butchering"],
-      "Physical": ["Fitness", "Lightfooted", "Nimble", "Running", "Sneaking", "Strength"],
-      "Survival": ["First Aid", "Fishing", "Foraging", "Tracking", "Trapping"]
-    };
+    (() => {
+      'use strict';
 
-    // Melee weapons that do not have skill books in base PZ
-    const noBookMelee = ["Axe", "Long Blade", "Short Blade", "Short Blunt", "Spear"];
+      const STORAGE_KEY = 'pz_skills_state';
+      const BOX_COUNT = 5;
 
-    let state = JSON.parse(localStorage.getItem('pz_skills_state')) || {};
-    let friendState = null;
-    const gridEl = document.getElementById('skills-grid');
-
-    function render() {
-      gridEl.innerHTML = '';
-
-      for (const [category, skills] of Object.entries(skillData)) {
-        const card = document.createElement('div');
-        card.className = 'category-card';
-
-        const title = document.createElement('h2');
-        title.className = 'category-title';
-        title.textContent = category;
-        card.appendChild(title);
-
-        skills.forEach(skill => {
-          const row = document.createElement('div');
-          row.className = 'skill-row';
-
-          const isNoBookSkill = category === "Combat - Melee" && noBookMelee.includes(skill);
-          if (isNoBookSkill) {
-            row.classList.add('no-book-row');
-          }
-
-          const name = document.createElement('span');
-          name.className = 'skill-name';
-          name.textContent = skill;
-          row.appendChild(name);
-
-          const boxesContainer = document.createElement('div');
-          boxesContainer.className = 'boxes-container';
-
-          for (let i = 0; i < 5; i++) {
-            const key = `${category}_${skill}_${i}`;
-            const boxState = state[key] || 0;
-            const friendBoxState = friendState ? (friendState[key] || 0) : 0;
-
-            const box = document.createElement('div');
-            box.className = 'box';
-            
-            updateBoxUI(box, boxState, friendBoxState, isNoBookSkill);
-
-            // Only attach click listeners if the skill actually has books
-            if (!isNoBookSkill) {
-              box.addEventListener('click', () => {
-                const nextState = state[key] === 1 ? 0 : 1;
-                state[key] = nextState;
-                localStorage.setItem('pz_skills_state', JSON.stringify(state));
-                updateBoxUI(box, nextState, friendState ? (friendState[key] || 0) : 0, isNoBookSkill);
-              });
-            }
-
-            boxesContainer.appendChild(box);
-          }
-
-          row.appendChild(boxesContainer);
-          card.appendChild(row);
-        });
-
-        gridEl.appendChild(card);
-      }
-    }
-
-    function updateBoxUI(el, userVal, friendVal, isNoBookSkill) {
-      el.className = 'box';
-
-      // Disabled melee skills remain blank and do not show friend overlays
-      if (isNoBookSkill) {
-        el.textContent = '';
-        return;
-      }
-
-      // User State
-      if (userVal === 1) {
-        el.classList.add('state-check');
-        el.textContent = '✓';
-      } else {
-        el.textContent = '';
-      }
-
-      // Friend Overlay Mode
-      if (friendState !== null) {
-        if (friendVal === 1) {
-          el.classList.add('friend-check');
-        } else {
-          el.classList.add('friend-cross');
-        }
-      }
-    }
-
-    function loadFromTxt() {
-      document.getElementById('load-file-input').click();
-    }
-
-    function handleLoadFileSelect(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const contents = e.target.result;
-        const parsed = parseTxtFile(contents);
-
-        if (parsed && Object.keys(parsed).length > 0) {
-          if (confirm("Overwrite your current checklist with the loaded file?")) {
-            state = parsed;
-            localStorage.setItem('pz_skills_state', JSON.stringify(state));
-            render();
-          }
-        } else {
-          alert("Could not parse file. Please upload a valid exported skill checklist TXT file.");
-        }
-        event.target.value = ''; // Reset input selection
-      };
-      reader.readAsText(file);
-    }
-
-    function toggleCompare() {
-      if (friendState) {
-        // Clear Compare Mode
-        friendState = null;
-        const btn = document.getElementById('btn-compare');
-        btn.textContent = '🤝 Compare File';
-        btn.classList.remove('active');
-        document.getElementById('legend-bar').style.display = 'none';
-        render();
-      } else {
-        document.getElementById('compare-file-input').click();
-      }
-    }
-
-    function handleFileSelect(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const contents = e.target.result;
-        const parsed = parseTxtFile(contents);
-
-        if (parsed && Object.keys(parsed).length > 0) {
-          friendState = parsed;
-          const btn = document.getElementById('btn-compare');
-          btn.textContent = '❌ Clear Compare';
-          btn.classList.add('active');
-          document.getElementById('legend-bar').style.display = 'flex';
-          render();
-        } else {
-          alert("Could not parse file. Please upload a valid exported skill checklist TXT file.");
-        }
-        event.target.value = ''; // Reset input selection
-      };
-      reader.readAsText(file);
-    }
-
-    function parseTxtFile(text) {
-      const parsed = {};
-      const lines = text.split('\n');
-      let currentCategory = '';
-
-      lines.forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('===') || trimmed.startsWith('SPIFFO')) return;
-
-        if (trimmed.endsWith(':') && !line.startsWith('\t')) {
-          currentCategory = trimmed.slice(0, -1).trim();
-        } else if (line.includes(':')) {
-          const parts = line.split(':');
-          const skillName = parts[0].trim();
-          const boxesPart = parts[1];
-
-          const brackets = boxesPart.match(/\[(.*?)\]/g);
-          if (brackets && brackets.length === 5 && currentCategory) {
-            brackets.forEach((b, i) => {
-              let val = 0;
-              if (b.includes('✓')) val = 1;
-              
-              parsed[`${currentCategory}_${skillName}_${i}`] = val;
-            });
-          }
-        }
+      const SKILL_DATA = Object.freeze({
+        "Combat - Firearms": ["Aiming", "Reloading"],
+        "Combat - Melee": ["Axe", "Long Blade", "Long Blunt", "Maintenance", "Short Blade", "Short Blunt", "Spear"],
+        "Crafting": ["Blacksmithing", "Carpentry", "Carving", "Cooking", "Electrical", "Glassmaking", "Knapping", "Masonry", "Mechanics", "Pottery", "Tailoring", "Welding"],
+        "Farming": ["Agriculture", "Animal Care", "Butchering"],
+        "Physical": ["Fitness", "Lightfooted", "Nimble", "Running", "Sneaking", "Strength"],
+        "Survival": ["First Aid", "Fishing", "Foraging", "Tracking", "Trapping"]
       });
 
-      return parsed;
-    }
+      const NO_BOOK_MELEE = new Set(["Axe", "Long Blade", "Short Blade", "Short Blunt", "Spear"]);
 
-    function exportToTxt() {
-      let output = "SPIFFO'S SKILL BOOK CHECKLIST\n";
-      output += "=============================\n\n";
+      const elements = {
+        grid: document.getElementById('skills-grid'),
+        btnSave: document.getElementById('btn-save'),
+        btnLoad: document.getElementById('btn-load'),
+        btnCompare: document.getElementById('btn-compare'),
+        btnReset: document.getElementById('btn-reset'),
+        loadFile: document.getElementById('load-file-input'),
+        compareFile: document.getElementById('compare-file-input'),
+        legendBar: document.getElementById('legend-bar')
+      };
 
-      for (const [category, skills] of Object.entries(skillData)) {
-        output += `${category}:\n`;
-        skills.forEach(skill => {
-          const isNoBookSkill = category === "Combat - Melee" && noBookMelee.includes(skill);
-          let boxString = "";
+      let state = loadInitialState();
+      let friendState = null;
 
-          for (let i = 0; i < 5; i++) {
-            const val = state[`${category}_${skill}_${i}`] || 0;
-            if (!isNoBookSkill && val === 1) {
-              boxString += "[✓] "; // Checked box
-            } else {
-              boxString += "[ ] "; // Unchecked / disabled box
+      function loadInitialState() {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          return stored ? JSON.parse(stored) : {};
+        } catch (e) {
+          console.error('Failed to parse localStorage state:', e);
+          return {};
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+          console.error('Failed to save state to localStorage:', e);
+        }
+      }
+
+      function parseTxtFile(text) {
+        const parsed = {};
+        const lines = text.split(/\r?\n/);
+        let currentCategory = '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('===') || trimmed.startsWith('SPIFFO')) continue;
+
+          if (trimmed.endsWith(':') && !line.startsWith('\t')) {
+            currentCategory = trimmed.slice(0, -1).trim();
+          } else if (line.includes(':')) {
+            const parts = line.split(':');
+            const skillName = parts[0].trim();
+            const boxesPart = parts[1];
+
+            const brackets = boxesPart.match(/\[(.*?)\]/g);
+            if (brackets && brackets.length === BOX_COUNT && currentCategory) {
+              brackets.forEach((b, i) => {
+                parsed[`${currentCategory}_${skillName}_${i}`] = b.includes('✓') ? 1 : 0;
+              });
             }
           }
-          const paddedSkill = (skill + ":").padEnd(16, " ");
-          output += `\t${paddedSkill} ${boxString.trim()}\n`;
-        });
-        output += "\n";
+        }
+
+        return parsed;
       }
 
-      const blob = new Blob([output], { type: 'text/plain' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'pz_skills.txt';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }
+      function updateBoxUI(el, userVal, friendVal, isNoBookSkill) {
+        el.className = 'box';
 
-    function resetAll() {
-      if (confirm("Clear all checked skill boxes?")) {
-        state = {};
-        localStorage.removeItem('pz_skills_state');
+        if (isNoBookSkill) {
+          el.textContent = '';
+          return;
+        }
+
+        if (userVal === 1) {
+          el.classList.add('state-check');
+          el.textContent = '✓';
+        } else {
+          el.textContent = '';
+        }
+
+        if (friendState !== null) {
+          el.classList.add(friendVal === 1 ? 'friend-check' : 'friend-cross');
+        }
+      }
+
+      function render() {
+        const fragment = document.createDocumentFragment();
+
+        for (const [category, skills] of Object.entries(SKILL_DATA)) {
+          const card = document.createElement('div');
+          card.className = 'category-card';
+
+          const title = document.createElement('h2');
+          title.className = 'category-title';
+          title.textContent = category;
+          card.appendChild(title);
+
+          skills.forEach(skill => {
+            const row = document.createElement('div');
+            row.className = 'skill-row';
+
+            const isNoBookSkill = category === 'Combat - Melee' && NO_BOOK_MELEE.has(skill);
+            if (isNoBookSkill) {
+              row.classList.add('no-book-row');
+            }
+
+            const name = document.createElement('span');
+            name.className = 'skill-name';
+            name.textContent = skill;
+            row.appendChild(name);
+
+            const boxesContainer = document.createElement('div');
+            boxesContainer.className = 'boxes-container';
+
+            for (let i = 0; i < BOX_COUNT; i++) {
+              const key = `${category}_${skill}_${i}`;
+              const boxState = state[key] || 0;
+              const friendBoxState = friendState ? (friendState[key] || 0) : 0;
+
+              const box = document.createElement('div');
+              box.dataset.key = key;
+              box.dataset.noBook = isNoBookSkill ? 'true' : 'false';
+
+              updateBoxUI(box, boxState, friendBoxState, isNoBookSkill);
+              boxesContainer.appendChild(box);
+            }
+
+            row.appendChild(boxesContainer);
+            card.appendChild(row);
+          });
+
+          fragment.appendChild(card);
+        }
+
+        elements.grid.replaceChildren(fragment);
+      }
+
+      function exportToTxt() {
+        let output = "SPIFFO'S SKILL BOOK CHECKLIST\n";
+        output += "=============================\n\n";
+
+        for (const [category, skills] of Object.entries(SKILL_DATA)) {
+          output += `${category}:\n`;
+          skills.forEach(skill => {
+            const isNoBookSkill = category === "Combat - Melee" && NO_BOOK_MELEE.has(skill);
+            let boxString = "";
+
+            for (let i = 0; i < BOX_COUNT; i++) {
+              const val = state[`${category}_${skill}_${i}`] || 0;
+              boxString += (!isNoBookSkill && val === 1) ? "[✓] " : "[ ] ";
+            }
+            const paddedSkill = (skill + ":").padEnd(16, " ");
+            output += `\t${paddedSkill} ${boxString.trim()}\n`;
+          });
+          output += "\n";
+        }
+
+        const blob = new Blob([output], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pz_skills.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function handleFileRead(file, callback) {
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const parsed = parseTxtFile(e.target.result);
+          if (parsed && Object.keys(parsed).length > 0) {
+            callback(parsed);
+          } else {
+            alert("Could not parse file. Please upload a valid exported skill checklist TXT file.");
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      function setupEventListeners() {
+        elements.grid.addEventListener('click', (e) => {
+          const box = e.target.closest('.box');
+          if (!box || box.dataset.noBook === 'true') return;
+
+          const key = box.dataset.key;
+          const nextState = state[key] === 1 ? 0 : 1;
+          state[key] = nextState;
+          
+          saveState();
+
+          const friendVal = friendState ? (friendState[key] || 0) : 0;
+          updateBoxUI(box, nextState, friendVal, false);
+        });
+
+        elements.btnSave.addEventListener('click', exportToTxt);
+        elements.btnLoad.addEventListener('click', () => elements.loadFile.click());
+
+        elements.loadFile.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          handleFileRead(file, (parsed) => {
+            if (confirm("Overwrite your current checklist with the loaded file?")) {
+              state = parsed;
+              saveState();
+              render();
+            }
+          });
+          e.target.value = '';
+        });
+
+        elements.btnCompare.addEventListener('click', () => {
+          if (friendState) {
+            friendState = null;
+            elements.btnCompare.textContent = '🤝 Compare File';
+            elements.btnCompare.classList.remove('active');
+            elements.legendBar.hidden = true;
+            render();
+          } else {
+            elements.compareFile.click();
+          }
+        });
+
+        elements.compareFile.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          handleFileRead(file, (parsed) => {
+            friendState = parsed;
+            elements.btnCompare.textContent = '❌ Clear Compare';
+            elements.btnCompare.classList.add('active');
+            elements.legendBar.hidden = false;
+            render();
+          });
+          e.target.value = '';
+        });
+
+        elements.btnReset.addEventListener('click', () => {
+          if (confirm("Clear all checked skill boxes?")) {
+            state = {};
+            localStorage.removeItem(STORAGE_KEY);
+            render();
+          }
+        });
+      }
+
+      function init() {
+        setupEventListeners();
         render();
       }
-    }
 
-    render();
+      init();
+    })();
   </script>
 </body>
 </html>
+
+```
