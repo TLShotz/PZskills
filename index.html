@@ -303,6 +303,26 @@
       white-space: nowrap;
       border: 0;
     }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      color: #b0a098;
+    }
+
+    footer a {
+      color: var(--spiffo-orange);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+      color: var(--spiffo-orange-hover);
+    }
   </style>
 </head>
 <body>
@@ -334,6 +354,10 @@
     </div>
 
     <main id="skills-grid" class="grid"></main>
+
+    <footer>
+      View source code on <a href="https://github.com/TLShotz/PZskills" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </footer>
   </div>
 
   <script>
